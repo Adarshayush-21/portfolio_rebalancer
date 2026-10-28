@@ -1,0 +1,46 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets and local configuration
+.env
+.env.*
+
+# Editors and operating system
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated data and outputs
+data/*_generated/
+data/*_ground_truth/
+data/*.db
+outputs/*
+!outputs/submission/
+!outputs/submission/**
+
+# Temporary files
+*.tmp
+*.log
+
+# Generated Python package metadata
+*.egg-info/
+
+# Temporary Node.js debugging dependencies
+node_modules/

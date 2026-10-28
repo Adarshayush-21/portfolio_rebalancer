@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portfolio Rebalancer</title>
+<style>
+:root{font-family:Inter,Segoe UI,Arial,sans-serif;color:#e8edf6;background:#0b1020;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0}header{padding:26px clamp(18px,4vw,56px);border-bottom:1px solid #263149;background:#10182b}
+.brand{font-size:12px;text-transform:uppercase;letter-spacing:.16em;color:#8ba5d8;font-weight:700}
+h1{margin:8px 0 4px;font-size:clamp(25px,4vw,36px)}.sub{color:#a9b6cc;margin:0}
+main{max-width:1400px;margin:auto;padding:24px clamp(14px,3vw,40px) 48px}
+.layout{display:grid;grid-template-columns:minmax(250px, .8fr) minmax(0,2fr);gap:20px}
+.panel{background:#111a2d;border:1px solid #263149;border-radius:16px;padding:18px;min-width:0}
+h2{font-size:16px;margin:0 0 14px}label{display:block;color:#9eafc9;font-size:12px;margin-bottom:7px}
+select,input,button{font:inherit;border-radius:9px;border:1px solid #33415e;background:#0c1425;color:#e8edf6;padding:10px 12px}
+select,input{width:100%;margin-bottom:12px}button{cursor:pointer;font-weight:650;background:#315ce8;border-color:#315ce8}button.secondary{background:#18243a;border-color:#33415e}button:disabled{opacity:.55;cursor:wait}
+.actions{display:flex;gap:8px;flex-wrap:wrap}.actions button{flex:1}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.metric{background:#0c1425;border:1px solid #263149;border-radius:12px;padding:14px}
+.metric .k{font-size:12px;color:#9eafc9}.metric .v{font-size:clamp(17px,2vw,25px);font-weight:750;margin-top:7px;overflow-wrap:anywhere}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #263149}th{color:#9eafc9;font-weight:600}
+.table-wrap{overflow-x:auto}.muted{color:#9eafc9}.pill{font-size:11px;padding:4px 8px;border-radius:999px;background:#24375a;color:#a9c2ff;white-space:nowrap}
+.good{color:#7be0b3}.bad{color:#ffb36b}.stack{display:grid;gap:16px}.explanation{padding:12px;background:#0c1425;border-radius:10px;margin:8px 0;color:#cbd7eb;line-height:1.55}
+#message{padding:12px;border-radius:10px;background:#192740;color:#c7d8ff;margin:0 0 16px;display:none;white-space:pre-wrap}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.metrics{grid-template-columns:1fr 1fr}.metrics .metric:last-child{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<header><div class="brand">YottaFlex AI · Portfolio Intelligence</div><h1>Portfolio Rebalancer</h1><p class="sub">Allocation drift, policy-aware proposals, and auditable simulation.</p></header>
+<main>
+<div id="message" role="status"></div>
+<div class="layout">
+<aside class="panel">
+<h2>Portfolio selector</h2>
+<label for="portfolio">Active portfolio</label><select id="portfolio"><option>Loading portfoliosâ€¦</option></select>
+<div class="actions"><button id="refresh" class="secondary">Refresh</button><button id="explain" class="secondary">Explain drift</button></div>
+<hr style="border:0;border-top:1px solid #263149;margin:20px 0">
+<h2>Rebalance workflow</h2>
+<label for="tolerance">Drift tolerance (fraction; 0.01 = 1 percentage point)</label><input id="tolerance" type="number" min="0" max="1" step="0.005" value="0.01">
+<div class="actions"><button id="propose">Create proposal</button></div>
+<p class="muted" style="font-size:12px;line-height:1.5">Simulation only. No broker, exchange, or live trading connection is used.</p>
+<hr style="border:0;border-top:1px solid #263149;margin:20px 0">
+<h2>Latest proposal</h2><div id="proposal-summary" class="muted">No proposal selected.</div>
+<div class="actions" style="margin-top:12px"><button id="receipts" class="secondary">View receipts</button><button id="simulate" class="secondary">Simulate</button></div>
+</aside>
+<section class="stack">
+<div class="metrics">
+<div class="metric"><div class="k">Portfolio value</div><div class="v" id="value">â€”</div></div>
+<div class="metric"><div class="k">Positions valued</div><div class="v" id="holding-count">â€”</div></div>
+<div class="metric"><div class="k">As-of date</div><div class="v" id="asof">â€”</div></div>
+</div>
+<div class="panel"><h2>Allocation drift</h2><div class="table-wrap"><table><thead><tr><th>Asset class</th><th>Actual</th><th>Target</th><th>Drift</th><th>Direction</th></tr></thead><tbody id="drift"><tr><td colspan="5" class="muted">Select a portfolio.</td></tr></tbody></table></div></div>
+<div class="panel"><h2>Grounded explanation</h2><p id="summary" class="muted">Choose a portfolio to calculate the explanation.</p><div id="observations"></div></div>
+<div class="panel"><h2>Largest holdings</h2><div class="table-wrap"><table><thead><tr><th>Symbol</th><th>Asset class</th><th>Quantity</th><th>Price</th><th>Market value</th></tr></thead><tbody id="holdings"><tr><td colspan="5" class="muted">No data yet.</td></tr></tbody></table></div></div>
+<div class="panel"><h2>Proposal details / decision receipts</h2><pre id="details" style="white-space:pre-wrap;overflow-wrap:anywhere;color:#cbd7eb;font-size:12px;line-height:1.5">Proposal actions will appear here.</pre></div>
+</section>
+</div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let currentPortfolio = null, currentProposal = null;
+const fmtMoney = value => new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2}).format(Number(value));
+const pct = value => (Number(value)*100).toFixed(2)+'%';
+function showMessage(message, error=false){$('message').style.display='block';$('message').textContent=message;$('message').style.background=error?'#3a202b':'#192740';$('message').style.color=error?'#ffc0c8':'#c7d8ff'}
+async function api(path, options={}){const response=await fetch(path,{headers:{'Content-Type':'application/json'},...options});const data=await response.json().catch(()=>({detail:response.statusText}));if(!response.ok)throw new Error(data.detail||JSON.stringify(data));return data}
+async function loadPortfolios(){const data=await api('/api/portfolios?limit=100&status=ACTIVE');$('portfolio').innerHTML='';for(const item of data.items){const option=document.createElement('option');option.value=item.portfolio_id;option.textContent=`${item.portfolio_id} Â· ${item.risk_profile}`;$('portfolio').append(option)}if(data.items.length){currentPortfolio=(data.items.find(item=>item.portfolio_id==='PORT-INV-000002-01')||data.items[0]).portfolio_id;$('portfolio').value=currentPortfolio;await loadPortfolio()}else showMessage('No active portfolios found.',true)}
+async function loadPortfolio(){currentPortfolio=$('portfolio').value;if(!currentPortfolio)return;try{const data=await api(`/api/portfolios/${encodeURIComponent(currentPortfolio)}`);$('value').textContent=fmtMoney(data.total_market_value);$('holding-count').textContent=data.holding_count.toLocaleString('en-IN');$('asof').textContent=data.as_of_date;
+$('drift').innerHTML=data.allocation_drift.map(x=>`<tr><td>${x.asset_class}</td><td>${pct(x.actual_weight)}</td><td>${pct(x.target_weight)}</td><td class="${Math.abs(Number(x.drift))>.01?'bad':'good'}">${Number(x.drift)>=0?'+':''}${pct(x.drift)}</td><td><span class="pill">${x.recommended_direction}</span></td></tr>`).join('');
+$('holdings').innerHTML=data.top_holdings.map(x=>`<tr><td>${x.symbol}</td><td>${x.asset_class}</td><td>${Number(x.quantity).toLocaleString('en-IN',{maximumFractionDigits:4})}</td><td>${fmtMoney(x.price)}</td><td>${fmtMoney(x.market_value)}</td></tr>`).join('')||'<tr><td colspan="5">No holdings.</td></tr>';
+await loadExplanation();showMessage(`Loaded ${currentPortfolio} for ${data.as_of_date}.`)}catch(error){showMessage(error.message,true)}}
+async function loadExplanation(){const data=await api(`/api/portfolios/${encodeURIComponent(currentPortfolio)}/explanation`);$('summary').textContent=data.summary;$('observations').innerHTML=data.observations.length?data.observations.map(x=>`<div class="explanation"><strong>${x.asset_class}: ${x.direction}</strong><br>${x.explanation}</div>`).join():'<div class="explanation">No asset class exceeds the configured drift tolerance.</div>'}
+async function createProposal(){try{const tolerance=Number($('tolerance').value);const data=await api(`/api/portfolios/${encodeURIComponent(currentPortfolio)}/proposals`,{method:'POST',body:JSON.stringify({drift_tolerance:tolerance})});currentProposal=data.proposal_id;$('proposal-summary').textContent=`${data.proposal_id} Â· ${data.status}`;$('details').textContent=JSON.stringify(data,null,2);showMessage(`Created ${data.proposal_id}: ${data.trade_count} proposed trades, ${data.rejected_decision_count} rejected decisions.`)}catch(error){showMessage(error.message,true)}}
+async function showReceipts(){if(!currentProposal){showMessage('Create a proposal first or select one from the API.',true);return}try{const data=await api(`/api/proposals/${encodeURIComponent(currentProposal)}/receipts`);$('details').textContent=JSON.stringify(data,null,2);showMessage(`Loaded ${data.count} decision receipts for ${currentProposal}.`)}catch(error){showMessage(error.message,true)}}
+async function simulate(){if(!currentProposal){showMessage('Create a proposal first. Existing proposals are not selected automatically.',true);return}if(!confirm(`Run simulation-only execution for ${currentProposal}? This changes simulation records, but does not place live trades.`))return;try{const data=await api(`/api/proposals/${encodeURIComponent(currentProposal)}/simulate`,{method:'POST'});$('details').textContent=JSON.stringify(data,null,2);$('proposal-summary').textContent=`${data.proposal_id} Â· ${data.status} Â· simulation only`;showMessage(`Simulation completed for ${currentProposal}. No live trades were placed.`)}catch(error){showMessage(error.message,true)}}
+$('portfolio').addEventListener('change',loadPortfolio);
+$('refresh').addEventListener('click',async()=>{
+  try{
+    await loadPortfolio();
+    const data=await api('/api/proposals?limit=50');
+    const proposal=data.items.find(item=>item.proposal_id==='RB-2026-000003');
+    if(proposal){
+      currentProposal=proposal.proposal_id;
+      $('proposal-summary').textContent=`${proposal.proposal_id} · ${proposal.status} · ${proposal.trade_count??'Existing'} trades`;
+      showMessage(`Refreshed portfolio and loaded proposal ${currentProposal}.`);
+    }else{
+      showMessage('Portfolio refreshed, but no matching proposal was found.');
+    }
+  }catch(error){showMessage(error.message,true)}
+});$('explain').addEventListener('click',async()=>{try{await loadExplanation();showMessage('Explanation refreshed from calculated portfolio data.')}catch(e){showMessage(e.message,true)}});$('propose').addEventListener('click',createProposal);$('receipts').addEventListener('click',showReceipts);$('simulate').addEventListener('click',simulate);
+loadPortfolios().catch(error=>showMessage(error.message,true));
+</script>
+</body>
+</html>
