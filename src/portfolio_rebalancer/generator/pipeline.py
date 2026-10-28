@@ -1,4 +1,5 @@
 
+from datetime import datetime, time, timezone
 from pathlib import Path
 
 from portfolio_rebalancer.config import DEFAULT_CONFIG, ProjectConfig
@@ -16,6 +17,7 @@ from portfolio_rebalancer.generator.market_data import (
     trading_dates,
 )
 from portfolio_rebalancer.generator.policies import generate_policies
+from portfolio_rebalancer.models.anomaly import AnomalyRecord
 from portfolio_rebalancer.reporting.csv_export import export_tables_to_csv
 from portfolio_rebalancer.reporting.json_export import write_json
 from portfolio_rebalancer.reporting.sql_export import export_sqlite_dump
@@ -86,6 +88,52 @@ def generate_dataset(
                 if include_anomalies
                 else []
             )
+
+            post_injection_integrity = validate_database_integrity(session)
+            post_injection_business = validate_business_rules(
+                session,
+                as_of_date,
+            )
+            post_injection_issues = (
+                post_injection_integrity.issues
+                + post_injection_business.issues
+            )
+
+            for label in ground_truth:
+                matching_issues = [
+                    issue
+                    for issue in post_injection_issues
+                    if issue.code == label["expected_detection"]
+                    and issue.entity_type == label["entity_type"]
+                    and issue.entity_id == label["entity_id"]
+                ]
+
+                session.add(
+                    AnomalyRecord(
+                        anomaly_id=label["anomaly_id"],
+                        dataset_run_id=f"SEED-{config.seed}",
+                        entity_type=label["entity_type"],
+                        entity_id=label["entity_id"],
+                        anomaly_type=label["anomaly_type"],
+                        severity=(
+                            matching_issues[0].severity
+                            if matching_issues
+                            else "ERROR"
+                        ),
+                        injected=True,
+                        detected=bool(matching_issues),
+                        details={
+                            "expected_detection": label["expected_detection"],
+                            "matching_issue_count": len(matching_issues),
+                        },
+                        created_at=datetime.combine(
+                            as_of_date,
+                            time.min,
+                            tzinfo=timezone.utc,
+                        ),
+                    )
+                )
+
             session.commit()
 
             final_integrity = validate_database_integrity(session)
