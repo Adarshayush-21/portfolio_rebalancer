@@ -160,20 +160,20 @@ def calculate_post_trade_snapshot(
         for asset_class, value in sorted(values_by_class.items())
     }
 
-    turnover = sum(
-        (trade.quantity * trade.price for trade in trades),
-        ZERO,
-    )
+    trade_notionals = [
+        (trade.quantity * trade.price).quantize(Decimal("0.01"))
+        for trade in trades
+    ]
+    turnover = sum(trade_notionals, ZERO)
     total_fees = sum((trade.fees for trade in trades), ZERO)
 
-    net_cash_flow = sum(
+    signed_trade_value = sum(
         (
-            trade.quantity * trade.price
-            if trade.side == "SELL"
-            else -(trade.quantity * trade.price)
+            notional if trade.side == "SELL" else -notional
         )
-        for trade in trades
-    ) - total_fees
+        for trade, notional in zip(trades, trade_notionals)
+    )
+    net_cash_flow = signed_trade_value - total_fees
 
     return {
         "proposal_id": proposal_id,

@@ -68,7 +68,10 @@ def validate_reconciliation(
             )
 
         calculated_turnover = sum(
-            (trade.quantity * trade.price for trade in proposal_trades),
+            (
+                (trade.quantity * trade.price).quantize(Decimal("0.01"))
+                for trade in proposal_trades
+            ),
             ZERO,
         )
         if abs(calculated_turnover - proposal.estimated_turnover) > TOLERANCE:

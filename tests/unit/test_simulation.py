@@ -398,3 +398,22 @@ def test_execution_failure_can_be_fully_rolled_back(session, monkeypatch):
         )
     ).all()
     assert events == []
+
+
+def test_simulation_rounds_trade_notional_to_cents(session):
+    trade = add_trade(
+        session,
+        instrument_id=BOND_ID,
+        side="BUY",
+        quantity=Decimal("3"),
+        price=Decimal("10.005"),
+    )
+    trade.fees = Decimal("0.50")
+    session.commit()
+
+    result = simulate_proposal_execution(session, PROPOSAL_ID)
+    snapshot = result["post_trade_snapshot"]
+
+    assert Decimal(snapshot["estimated_turnover"]) == Decimal("30.02")
+    assert Decimal(snapshot["total_fees"]) == Decimal("0.50")
+    assert Decimal(snapshot["net_cash_flow_from_trades"]) == Decimal("-30.52")
