@@ -14,7 +14,7 @@ A reproducible synthetic portfolio dataset generator and policy-constrained port
 
 ## Requirements
 
-- Python 3.13 or a compatible Python version supported by the project dependencies.
+- Python 3.11 or newer, as declared in `pyproject.toml`.
 - Dependencies declared in `pyproject.toml`.
 - PowerShell on Windows, or an equivalent terminal.
 
