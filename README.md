@@ -1,52 +1,37 @@
 # Portfolio Rebalancer
 
-A reproducible synthetic portfolio dataset generator and policy-constrained portfolio rebalancing workflow. The project models investors, portfolios, instruments, holdings, historical market prices, target allocations, trading policies, fees, constraints, and rebalance proposals.
+A portfolio rebalancing and validation system developed for the YottaFlex AI Technologies Pvt. Ltd. **72 Hours Code Challenge**.
 
-## Features
+The project generates reproducible portfolio and market datasets, validates portfolio and trading data, detects anomalies, records detection results, and provides API and dashboard access.
 
-- Deterministic synthetic data generation using a configurable random seed.
-- Relational data model backed by SQLite.
-- Portfolio valuation, allocation drift, and policy-constrained rebalance recommendations.
-- Synthetic anomaly injection with separate ground-truth labels.
-- Database integrity and business-rule validation.
-- CSV and SQL exports, JSON reports, and reproducibility checks.
-- Automated unit and integration tests.
+## How to Run the Project
 
-## Requirements
+### 1. Install Dependencies
 
-- Python 3.11 or newer, as declared in `pyproject.toml`.
-- Dependencies declared in `pyproject.toml`.
-- PowerShell on Windows, or an equivalent terminal.
-
-## Setup
-
-From the project root, create and activate a virtual environment:
+Python 3.11 or newer is required.
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-python -m pip install -e .
-python -m pip install pytest
+python -m pip install -e ".[app,dev]"
 ```
 
-Run the test suite:
+### 2. Run Tests
 
 ```powershell
 python -m pytest -q
 ```
 
-## Generate the dataset
+Expected result: all tests pass.
 
-The default scale is 1,000 portfolios, 5,000 instruments, and 250 trading days. The default seed is `20261022`.
-
-Use dedicated paths for a full-scale run:
+### 3. Generate the Dataset
 
 ```powershell
 python scripts\generate_data.py `
-  --database outputs\full_run\portfolio_rebalancer.db `
-  --output-dir outputs\full_run\generated `
-  --ground-truth-dir outputs\full_run\ground_truth `
+  --database outputs\final_run\portfolio_rebalancer.db `
+  --output-dir outputs\final_run\generated `
+  --ground-truth-dir outputs\final_run\ground_truth `
   --seed 20261022 `
   --portfolios 1000 `
   --instruments 5000 `
@@ -54,137 +39,9 @@ python scripts\generate_data.py `
   --start-date 2025-10-01
 ```
 
-**Important:** Generation resets the database supplied through `--database`. Use a dedicated database path if you need to preserve existing data.
+**Note:** Dataset generation may take several minutes. It resets the database specified by `--database`, so do not use a database containing data you need to preserve.
 
-To generate a smaller dataset for development:
-
-```powershell
-python scripts\generate_data.py `
-  --database outputs\dev\portfolio_rebalancer.db `
-  --output-dir outputs\dev\generated `
-  --ground-truth-dir outputs\dev\ground_truth `
-  --portfolios 10 `
-  --instruments 50 `
-  --trading-days 20
-```
-
-To generate a clean baseline without injected anomalies, add `--no-anomalies`.
-
-## Validate the dataset
-
-Generation produces a summary and validation reports. Inspect:
-
-- `outputs/full_run/generated/generation_summary.json`
-- `outputs/full_run/generated/baseline_validation.json`
-- `outputs/full_run/generated/validation_report.json`
-- `outputs/full_run/ground_truth/ground_truth.json`
-
-Run standalone validation using the generated summary's `as_of_date`:
-
-```powershell
-$summary = Get-Content outputs\full_run\generated\generation_summary.json -Raw | ConvertFrom-Json
-
-python scripts\validate_data.py `
-  --database outputs\full_run\portfolio_rebalancer.db `
-  --as-of-date $summary.as_of_date `
-  --output outputs\full_run\validation_report_standalone.json
-```
-
-The validator returns exit code `0` when the report passes and `1` when it does not. Review the report for errors and warnings rather than assuming that a successful generation means every business rule passed.
-
-## Export data
-
-Export database tables to CSV and create a SQL dump:
-
-```powershell
-python scripts\export_data.py `
-  --database outputs\full_run\portfolio_rebalancer.db `
-  --output-dir outputs\full_run\reexport
-```
-
-The generation pipeline also writes CSV exports and a SQL dump to its configured output directory.
-
-## Run a rebalance proposal
-
-The rebalancing CLI operates on an existing database. It does not generate the synthetic dataset.
-
-```powershell
-python -m portfolio_rebalancer.cli --help
-```
-
-Example:
-
-```powershell
-python -m portfolio_rebalancer.cli `
-  --database outputs\full_run\portfolio_rebalancer.db `
-  --portfolio-id PORT-INV-000001-01
-```
-
-Optional arguments include `--as-of-date`, `--proposal-id`, and `--drift-tolerance`. Use a portfolio identifier that exists in the selected database.
-
-## Tests
-
-Run all tests:
-
-```powershell
-python -m pytest -q
-```
-
-The suite covers unit-level behavior, generation, validation, anomaly detection, and reproducibility.
-
-## Reproducibility
-
-The default seed is `20261022`. With the same configuration and deterministic code, repeated generation should produce identical output files and row counts.
-
-For repeatability checks, compare generated file hashes and row counts using the reproducibility utilities and tests.
-
-## Project structure
-
-```text
-src/portfolio_rebalancer/
-    calculations/    Valuation, allocations, and drift
-    database/        Database setup, schema, and repositories
-    evaluation/      Ground truth, metrics, reproducibility
-    generator/       Synthetic data and anomaly generation
-    models/          Domain entities
-    rebalancer/      Trade sizing, constraints, fees, decisions
-    reporting/       CSV, JSON, SQL, and summaries
-    simulation/      Execution and post-trade simulation
-    validation/      Integrity and business-rule checks
-
-scripts/
-    generate_data.py
-    export_data.py
-    validate_data.py
-    run_rebalancing.py
-
-tests/
-docs/
-data/
-outputs/
-```
-
-## Data quality and interpretation
-
-Synthetic ground-truth labels describe intentionally injected scenarios. Validation findings describe issues detected by the implemented rules. These are related but distinct: review detection metrics and the validation report to assess how well the rules identify the injected scenarios.
-
-All generated records are simulated data and should not be interpreted as real investor accounts, market observations, or investment advice.
-
-## API and Dashboard
-
-The application includes a FastAPI backend and a browser-based dashboard for inspecting portfolios, reviewing allocation explanations, creating rebalance proposals, and examining simulation results and decision receipts.
-
-### Install application dependencies
-
-Install the project with the optional API and development dependencies:
-
-```powershell
-python -m pip install -e ".[app,dev]"
-```
-
-### Start the API
-
-Start the API from the project root. The following example uses the generated full-scale database:
+### 4. Start the API Server
 
 ```powershell
 $env:PORTFOLIO_REBALANCER_DB = "outputs\final_run\portfolio_rebalancer.db"
@@ -195,38 +52,221 @@ python -m uvicorn portfolio_rebalancer.api:app `
   --workers 1
 ```
 
-Ensure the database exists before starting the application. The `PORTFOLIO_REBALANCER_DB` environment variable can point to a different database.
-
 Keep the terminal running while using the application.
 
-### Open the application
+### 5. Open the Application
 
-With the API running, open these URLs in your browser:
+- **Dashboard:** http://127.0.0.1:8000/
+- **API documentation:** http://127.0.0.1:8000/docs
+- **Health check:** http://127.0.0.1:8000/api/health
 
-- Dashboard: http://127.0.0.1:8000/
-- Interactive API documentation: http://127.0.0.1:8000/docs
-- Health check: http://127.0.0.1:8000/api/health
+## Features
 
-The dashboard uses the local API to load portfolio data and display explanations, proposals, and simulation information.
+- Reproducible portfolio and market-data generation.
+- Portfolio and trading-data validation.
+- Anomaly detection and ground-truth comparison.
+- SQLite database persistence.
+- CSV exports for generated data and detection results.
+- REST API endpoints.
+- Browser-based dashboard.
+- Automated tests using pytest.
 
-### API endpoints
+## Requirements
 
-| Method | Endpoint | Purpose |
+- Python 3.11 or newer.
+- pip.
+- Dependencies defined in `pyproject.toml`.
+
+## Installation
+
+If you have not already installed the project, create a virtual environment and install the dependencies:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[app,dev]"
+```
+
+If the virtual environment is already active and dependencies are installed, you can skip this step.
+
+## Data Generation
+
+The `scripts/generate_data.py` script generates portfolio data, instruments, market prices, and ground-truth files.
+
+Example configuration:
+
+| Setting | Value |
+|---|---|
+| Random seed | `20261022` |
+| Portfolios | `1000` |
+| Instruments | `5000` |
+| Trading days | `250` |
+| Start date | `2025-10-01` |
+| Database | `outputs/final_run/portfolio_rebalancer.db` |
+| Generated CSV directory | `outputs/final_run/generated` |
+| Ground-truth directory | `outputs/final_run/ground_truth` |
+
+Using the same seed and configuration helps make dataset generation reproducible.
+
+## Database and Output Files
+
+The example run writes its output under `outputs/final_run/`.
+
+| Path | Description |
+|---|---|
+| `outputs/final_run/portfolio_rebalancer.db` | SQLite database containing application data and anomaly records |
+| `outputs/final_run/generated/` | Generated CSV files |
+| `outputs/final_run/ground_truth/` | Ground-truth files for evaluating anomaly detection |
+
+The API uses the database path configured by the `PORTFOLIO_REBALANCER_DB` environment variable.
+
+## Validation
+
+The project validates portfolio and trading data against configured business rules.
+
+Potential findings include:
+
+- Invalid or inconsistent target weights.
+- Stale market prices.
+- Missing fee schedules.
+- Trades exceeding available holdings.
+- Recommendations involving excluded instruments.
+- Stale trade prices.
+
+Validation results should be interpreted in the context of the dataset and its ground-truth labels. Deliberately injected negative cases may produce expected errors or warnings.
+
+## Ground Truth and Anomaly Detection
+
+Ground-truth files provide reference labels for evaluating anomaly detection.
+
+The pipeline records anomaly information in the SQLite `AnomalyRecord` table and exports anomaly information to CSV where configured.
+
+When evaluating a run, compare:
+
+1. The number of anomalies injected.
+2. The number of anomalies recorded.
+3. Whether expected anomalies were marked as detected.
+4. Whether database records and CSV exports agree.
+5. Whether validation findings match the intended test cases.
+
+Use the same seed and configuration when comparing runs.
+
+## Running Tests
+
+Run the test suite from the project root:
+
+```powershell
+python -m pytest -q
+```
+
+For detailed output:
+
+```powershell
+python -m pytest -v
+```
+
+The automated tests cover core project functionality, including data generation, validation, and anomaly recording.
+
+## API and Dashboard
+
+Start the API server with:
+
+```powershell
+$env:PORTFOLIO_REBALANCER_DB = "outputs\final_run\portfolio_rebalancer.db"
+
+python -m uvicorn portfolio_rebalancer.api:app `
+  --host 127.0.0.1 `
+  --port 8000 `
+  --workers 1
+```
+
+Available resources:
+
+| Resource | URL | Description |
 |---|---|---|
-| GET | `/api/health` | Check API health |
-| GET | `/api/portfolios` | List portfolios |
-| GET | `/api/portfolios/{portfolio_id}` | Retrieve portfolio details |
-| GET | `/api/portfolios/{portfolio_id}/explanation` | Retrieve a portfolio explanation |
-| POST | `/api/portfolios/{portfolio_id}/proposals` | Create a rebalance proposal |
-| GET | `/api/proposals` | List proposals |
-| GET | `/api/proposals/{proposal_id}` | Retrieve proposal details |
-| GET | `/api/proposals/{proposal_id}/receipts` | Retrieve decision receipts |
-| POST | `/api/proposals/{proposal_id}/simulate` | Simulate a proposal |
+| Dashboard | http://127.0.0.1:8000/ | Browser-based application interface |
+| API documentation | http://127.0.0.1:8000/docs | Interactive API documentation |
+| Health check | http://127.0.0.1:8000/api/health | Application health endpoint |
 
-Use `/docs` to inspect request parameters, schemas, and responses.
+Keep the API server running while using the dashboard or API.
 
-### Simulation and safety
+## Project Structure
 
-This project demonstrates simulated portfolio rebalancing. Proposal creation and simulation operate on the application's database and may change simulated records. They do not place orders with a broker or execute real-world trades.
+```text
+portfolio-rebalancer/
+├── portfolio_rebalancer/
+├── scripts/
+│   └── generate_data.py
+├── outputs/
+│   └── final_run/
+│       ├── generated/
+│       ├── ground_truth/
+│       └── portfolio_rebalancer.db
+├── tests/
+├── README.md
+└── pyproject.toml
+```
 
-Use a dedicated development database when testing workflows that modify proposal or simulation state. Do not point experiments at data you need to preserve.
+Generated output directories and files may not exist until the data-generation command has been run.
+
+## Data Quality and Interpretation
+
+The dataset includes deliberately injected negative cases to exercise validation and anomaly detection.
+
+Distinguish between:
+
+- **Expected findings:** Issues intentionally introduced to test validation or detection.
+- **Unexpected findings:** Issues not explained by the intended test cases or configuration.
+- **Detection results:** Whether the pipeline identified and recorded an injected anomaly.
+- **Validation results:** Whether data satisfies configured business rules.
+
+A successful execution does not necessarily mean every validation result must be free of errors. Evaluate validation findings separately from anomaly-detection results.
+
+## Troubleshooting
+
+### Python or pip is not recognized
+
+Check the installed versions:
+
+```powershell
+python --version
+python -m pip --version
+```
+
+### Dependencies are missing
+
+Activate the virtual environment and install dependencies:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[app,dev]"
+```
+
+### The API cannot find the database
+
+Verify that the database exists and set the environment variable in the same PowerShell session used to start the server:
+
+```powershell
+$env:PORTFOLIO_REBALANCER_DB = "outputs\final_run\portfolio_rebalancer.db"
+```
+
+### The dashboard does not open
+
+Confirm that the API server started successfully, then open:
+
+http://127.0.0.1:8000/
+
+### Tests fail
+
+Run the tests with detailed output:
+
+```powershell
+python -m pytest -v
+```
+
+Review the first failure and its traceback before investigating subsequent failures.
+
+## License
+
+Refer to the repository's license information and challenge instructions for applicable usage and distribution terms.
